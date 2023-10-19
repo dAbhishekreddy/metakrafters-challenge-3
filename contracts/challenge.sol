@@ -1,65 +1,100 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
 
-// Here the overview of the challenge is to create  the contract in which owner only
-//  have the permission to mint the tokens to the given specific address
+
+// Here the overview of the challenge is to create  the contract in which owner
+// only have the permission to mint the tokens to the given specific address
 // And other is any user should be able to burn and transfer tokens.
 
-// Here we are declaring the contract named as challenge and contain state variables as name,symbol,totalsupply
-contract challenge {
-    string public name;
-    string public symbol;
-    uint256 public totalSupply;
-    // Here we are mapping addresses to thier respective token adresses
-    mapping(address => uint256) public balanceOf;
-    // Declaring public address variable named owner which stores the adress of contract owner
-    address public owner;
-    // Here we are declaring events and they are used to log specific occurences within smart contract
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Burn(address indexed from, uint256 value);
-    event Mint(address indexed to, uint256 value);
+pragma solidity 0.8.18;
+// This is an interface for the ERC-20 standard functions that any ERC-20 token contract must implement.
 
-    // Declaring a constructor function and takes two parameters name & symbol
-    constructor(string memory _name, string memory _symbol) {
-        name = _name;
-        symbol = _symbol;
-        totalSupply = 0;
+
+interface IERC20 {
+    // This  totalSupply function returns the total supply of tokens.
+    function totalSupply() external view returns (uint);
+    
+//  The balanceOf function returns the balance of tokens for a given address.
+    function balanceOf(address account) external view returns (uint);
+// The transfer function allows an address to send tokens to another address.
+    function transfer(address recipient, uint amount) external returns (bool);
+
+    // The allowance function returns the amount of tokens that an address is allowed to spend on behalf of another address
+    function allowance(address owner, address spender) external view returns (uint);
+    
+// The approve function allows an address to approve another address to spend a certain amount of tokens.
+    function approve(address spender, uint amount) external returns (bool);
+    
+ // The transferFrom function allows an approved address to spend tokens on behalf of the owner.
+    function transferFrom(address spender, address recipient, uint amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint amount);
+    event Approval(address indexed owner, address indexed spender, uint amount);
+}
+
+// This contract inherits from the IERC20 interface and implements the ERC-20 functions.
+contract ERC20 is IERC20 {
+    address public immutable owner;
+    uint public totalSupply;
+    
+// A mapping to store the balances of token holders.
+    mapping (address => uint) public balanceOf;
+    mapping (address => mapping (address => uint)) public allowance;
+    
+// The 'owner' is set to the address that deployed the contract.
+    constructor() {
         owner = msg.sender;
     }
-
-    // Declaring a modifier named as onlyowner
-    modifier onlyOwner() {
-        require(
-            msg.sender == owner,
-            "Only the contract owner can perform this action"
-        );
-        _;
+    modifier onlyOwner {
+        require(msg.sender == owner, "Only owner can execute this function");
+        // Only the owner can execute functions with this modifier.
+        _; // Continue with the function's execution.
     }
 
-    // Function for minting the tokens
-    function mint(address to, uint256 value) public onlyOwner {
-        balanceOf[to] += value;
-        totalSupply += value;
-        emit Mint(to, value);
-        emit Transfer(address(0), to, value);
+    string public constant name = "ABHI";
+    string public constant symbol = "AB";
+    uint8 public constant decimals = 18;
+   
+   // Allows the sender to transfer tokens to another address and 
+   // Checks if the sender has a sufficient balance to perform the transfer.
+    function transfer(address recipient, uint amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "Insufficient Balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+ // this function allows the sender to approve another address to spend tokens on their behalf and
+  // Ensures that the approval amount is positive.
+    function approve(address spender, uint amount) external returns (bool) {
+        require(amount > 0, "Approval amount must be greater than zero");
+        allowance[msg.sender][spender] += amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
     }
 
-    // Function for burning the tokens
-    function burn(uint256 value) public {
-        require(balanceOf[msg.sender] >= value, "Insufficient balance");
-
-        balanceOf[msg.sender] -= value;
-        totalSupply -= value;
-        emit Burn(msg.sender, value);
-        emit Transfer(msg.sender, address(0), value);
+    // this function transfer from allows an approved address to transfer tokens on behalf of the owner.
+    function transferFrom(address sender, address recipient, uint amount) external returns (bool) {
+ // Check if the sender has a sufficient balance and the spender is allowed to spend the required amount.
+        require(balanceOf[sender] >= amount, "Insufficient Balance");
+        require(allowance[sender][msg.sender] >= amount, "Less approval to spend tokens");
+        allowance[sender][msg.sender] -= amount;
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
     }
-
-    // function for transfering the tokens
-    function transfer(address to, uint256 value) public {
-        require(balanceOf[msg.sender] >= value, "Insufficient balance");
-
-        balanceOf[msg.sender] -= value;
-        balanceOf[to] += value;
-        emit Transfer(msg.sender, to, value);
+     // Allows the owner to mint new tokens.
+    function mint(uint amount) external onlyOwner {
+        balanceOf[msg.sender] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), msg.sender, amount);
+    }
+ // Allows an address to burn  their own tokens.
+    function burn(uint amount) external {
+        require(amount > 0, "Amount should not be zero");
+        require(balanceOf[msg.sender] >= amount, "Insufficient Balance");
+        balanceOf[msg.sender] -= amount;
+        totalSupply -= amount;
+        emit Transfer(msg.sender, address(0), amount);
+       
     }
 }
